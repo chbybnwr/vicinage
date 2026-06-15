@@ -2,6 +2,7 @@ export { apply }
 export { sheet }
 export type { StyleDeck }
 
+export { attrs as '~attrs' }
 export type { CommonProperties as '~CommonProperties' }
 export type { CompiledProperties as '~CompiledProperties' }
 export type { CompiledValue as '~CompiledValue' }
@@ -27,6 +28,19 @@ export type { StylexAttributes as '~StylexAttributes' }
 export type { StylexProperties as '~StylexProperties' }
 
 /* eslint-disable @typescript-eslint/no-empty-object-type */
+
+/**
+ * @public
+ */
+type StyleDeck<T extends StyleConfig = StyleConfig> =
+  | StyleDeck<T>[]
+  | StyleCard<T>
+  | readonly [StyleCard<T>, InlineStyles]
+  | Theme<VarGroup<{}>>
+  | NonApplicableThemeProperties
+  | NonApplicableObjectProperties
+  | NonApplicableSymbolProperties
+  | undefined
 
 /**
  * @internal
@@ -71,17 +85,53 @@ function mergeClassProperty(
 }
 
 /**
- * @public
+ * @internal
  */
-type StyleDeck<T extends StyleConfig = StyleConfig> =
-  | StyleDeck<T>[]
-  | StyleCard<T>
-  | readonly [StyleCard<T>, InlineStyles]
-  | Theme<VarGroup<{}>>
-  | NonApplicableThemeProperties
-  | NonApplicableObjectProperties
-  | NonApplicableSymbolProperties
-  | undefined
+function attrs(
+  this: unknown,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ...styles: any[]
+): ReturnType<(typeof stylex)['attrs']> extends infer T
+  ? { [Key in keyof T]: T[Key] | undefined }
+  : never {
+  const {
+    className,
+    style,
+    'data-style-src': styleSource,
+  } = props.apply(this, styles)
+
+  return {
+    ...(className == null
+      ? {}
+      : {
+          class: className,
+        }),
+
+    ...(style == null
+      ? {}
+      : {
+          style: Object.entries(style)
+            .map(([key, value]) => {
+              if (key.startsWith('--')) {
+                return `${key}:${value.toString()}`
+              }
+
+              return `${toKebabCase(key)}:${value.toString()}`
+            })
+            .join(';'),
+        }),
+
+    ...(styleSource == null
+      ? {}
+      : {
+          ['data-style-src']: styleSource,
+        }),
+  }
+}
+
+function toKebabCase(text: string): string {
+  return text.replaceAll(/([A-Z])/g, '-$1').toLowerCase()
+}
 
 /**
  * Apply styles as props `{ className, style }`, or attrs `{ class, style }`.
@@ -364,6 +414,7 @@ import type { StyleXClassNameFor as ClassNameFor } from '@stylexjs/stylex'
 import type { CSSPropertiesWithExtras } from '@stylexjs/stylex/lib/types/StyleXTypes'
 import type { InlineStyles } from '@stylexjs/stylex'
 import type { Properties } from 'csstype'
+import { props } from '@stylexjs/stylex'
 import type { Pseudos } from 'csstype'
 import type * as stylex from '@stylexjs/stylex'
 import type { StyleXVar } from '@stylexjs/stylex'
